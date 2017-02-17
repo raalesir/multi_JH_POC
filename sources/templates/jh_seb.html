@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,  initial-scale=1">
+    <!-- The above 3 meta tags *must* come first
+    in the head; any other head content must come *after* these
+    tags -->
+    <title>Connect to JupyterHub at SEB</title>
+
+    <!-- Bootstrap -->
+    <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- HTML5 shim and Respond.js for IE8
+    support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page
+  via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/html5shiv/3.7.3/html5shiv.min.js"></script>
+        <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+     <![endif]-->
+</head>
+
+<body>
+<div class="col-xs-12" style="height:50px;"></div>
+<div class="container">
+    <div class="row">
+        <div class="col-sm-2"></div>
+        <div class="col-sm-8">
+            <div class="well">
+                {% if name %}
+                    <div class="alert alert-success">
+                        <h1> Hello, {{ name }} </h1>
+                        {{ msg|safe }}</br>
+                    </div>
+                    {% if links %}
+                        {% for link in links %}
+                            <a class="lead" href="http://{{ link }}:8000/user/{{ name }}/">
+                                Jupyter server at {{ link }}</a></br>
+                        {% endfor %}
+                    {% endif %}
+                {% elif error %}
+                    <div class="alert alert-danger">
+                        <h2> {{ error|safe }} </h2>
+                    </div>
+                    <form action=.>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-danger">Try again</button>
+                        </div>
+                    </form>
+
+                {% else %}
+                    <h1> Hello, Stranger! </h1>
+                    <form action=. method='POST'>
+                        <div class="form-group">
+                            <label for="exampleInputEmail1">Please enter your
+                                username at SEB cluster</label>
+                            <input type="text" name="username"
+                                   class="form-control" placeholder="Enter username">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Submit</button>
+                    </form>
+
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-2"></div>
+
+</div><!-- /.container -->
+<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<!-- Include all compiled plugins (below), or include individual files as needed -->
+<script src="http://getbootstrap.com/dist/js/bootstrap.min.js"></script>
+</body>
+</html>

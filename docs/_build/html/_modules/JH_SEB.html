@@ -1,0 +1,252 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>JH_SEB &#8212; multiJHub 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '../',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <h1>Source code for JH_SEB</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">Flask</span>
+<span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">render_template</span>
+<span class="kn">from</span> <span class="nn">flask</span> <span class="k">import</span> <span class="n">request</span>
+<span class="kn">import</span> <span class="nn">glob</span>
+<span class="kn">import</span> <span class="nn">re</span>
+<span class="kn">import</span> <span class="nn">subprocess</span>
+<span class="kn">import</span> <span class="nn">random</span>
+
+<span class="c1">#TODO introduce LOGGING.... :)</span>
+
+<span class="n">CLUSTER</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="s1">&#39;192.168.1.10&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;192.168.1.11&#39;</span>
+<span class="p">]</span>
+
+<span class="n">USERS</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;ubuntu&#39;</span><span class="p">,</span> <span class="s1">&#39;juser1&#39;</span><span class="p">]</span>
+
+<span class="c1">#template for the *running* Jupyter server file</span>
+<span class="n">Jupyter_server_file</span> <span class="o">=</span> <span class="s1">&#39;/home/xxx/.local/share/jupyter/runtime/nbserver*.json&#39;</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Flask</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;POST&#39;</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">])</span>
+<span class="k">def</span> <span class="nf">index</span><span class="p">():</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">error</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">links</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">PID</span><span class="o">=</span><span class="p">[]</span>
+    <span class="n">ips</span><span class="o">=</span><span class="p">[]</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="n">request</span><span class="o">.</span><span class="n">form</span><span class="p">[</span><span class="s1">&#39;username&#39;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">name</span>  <span class="ow">in</span>  <span class="n">USERS</span><span class="p">:</span>
+            <span class="n">running_jupyter_servers</span> <span class="o">=</span> <span class="n">get_jupyter_servers</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="n">running_jupyter_servers</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">running_jupyter_servers</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;It looks like you are running multiple servers!!!!&lt;br/&gt; Please run just one&quot;</span> \
+                     <span class="s2">&quot;server at a time. Returning the first in the list.&lt;br/&gt;&quot;</span>
+            <span class="k">elif</span> <span class="nb">len</span><span class="p">(</span><span class="n">running_jupyter_servers</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">msg</span><span class="o">=</span><span class="s2">&quot;This is the link to your running Jupyter server. &lt;br/&gt;Please</span><span class="se">\</span>
+<span class="s2">                        remember to shutdown notebooks and Jupyter server when not in use...&lt;br/&gt;</span><span class="se">\</span>
+<span class="s2">                                After session LOGOUT if want to keep your data private&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;It looks like you have no running Jupyter servers. Just follow the link&quot;</span>
+                <span class="n">ips</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_new_ip</span><span class="p">())</span> <span class="c1"># .append(random.choice(CLUSTER))</span>
+
+            <span class="k">for</span> <span class="n">server</span> <span class="ow">in</span> <span class="n">running_jupyter_servers</span><span class="p">:</span>
+                <span class="n">ips</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_ip</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
+
+            <span class="nb">print</span><span class="p">(</span><span class="n">ips</span><span class="p">)</span>
+            <span class="k">return</span> <span class="n">render_template</span><span class="p">(</span><span class="s2">&quot;jh_seb.html&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="n">error</span><span class="p">,</span>
+                                   <span class="n">links</span><span class="o">=</span><span class="n">ips</span><span class="p">,</span> <span class="n">msg</span><span class="o">=</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">error</span> <span class="o">=</span> <span class="s2">&quot;System does not recognize you. &lt;br/&gt; Please check username.&quot;</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1"># print &quot;get method &quot;#,request.form[&#39;username&#39;]</span>
+    <span class="k">return</span> <span class="n">render_template</span><span class="p">(</span><span class="s2">&quot;jh_seb.html&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">error</span><span class="o">=</span><span class="n">error</span><span class="p">)</span>
+
+
+
+<div class="viewcode-block" id="get_ip"><a class="viewcode-back" href="../index.html#JH_SEB.get_ip">[docs]</a><span class="k">def</span> <span class="nf">get_ip</span><span class="p">(</span><span class="n">server</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Extracts the PID from the string ``server`` and finds IP of the PID</span>
+
+<span class="sd">    :param server: the string like `/home/ubuntu/.local/share/jupyter/runtime/nbserver-2085.json`</span>
+<span class="sd">    :return: the `IP` running the ``Jupyter`` server with the given `PID`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">pid</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">findall</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;\d+&quot;</span><span class="p">,</span> <span class="n">server</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="c1">#print server, pid</span>
+    <span class="n">ip</span> <span class="o">=</span> <span class="n">find_host</span><span class="p">(</span><span class="n">pid</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">ip</span></div>
+
+
+
+<div class="viewcode-block" id="find_host"><a class="viewcode-back" href="../index.html#JH_SEB.find_host">[docs]</a><span class="k">def</span> <span class="nf">find_host</span><span class="p">(</span><span class="n">pid</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Find a host based on the ``PID`` of the ``Jupyter`` server</span>
+
+<span class="sd">    :param pid: the ``PID`` of the server</span>
+<span class="sd">    :return: ``None`` if not found, hostname otherwise</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># ssh to each node and get IP of the node with running  on</span>
+    <span class="c1">#  user&#39;s behalf Jupyterhub</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">host</span> <span class="ow">in</span> <span class="n">CLUSTER</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">pid</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">check_host</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">pid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">result</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">host</span></div>
+
+
+
+<div class="viewcode-block" id="get_new_ip"><a class="viewcode-back" href="../index.html#JH_SEB.get_new_ip">[docs]</a><span class="k">def</span> <span class="nf">get_new_ip</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    function selects one of the nodes in the `CLUSTER` based on some</span>
+<span class="sd">    rule...\n</span>
+<span class="sd">    At the moment it is just a random choice between available hosts:</span>
+<span class="sd">    ``[random.choice(CLUSTER)][0]``</span>
+
+<span class="sd">    :return: ``IP`` address of the selected node</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="p">[</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">CLUSTER</span><span class="p">)][</span><span class="mi">0</span><span class="p">]</span></div>
+
+
+
+<div class="viewcode-block" id="get_jupyter_servers"><a class="viewcode-back" href="../index.html#JH_SEB.get_jupyter_servers">[docs]</a><span class="k">def</span> <span class="nf">get_jupyter_servers</span><span class="p">(</span><span class="n">username</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Are there Jupyter servers running and how many for the ``username``?</span>
+
+<span class="sd">    :param username: username at SEB cluster</span>
+<span class="sd">    :return:    list of running `Jupyter` servers</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">servers</span> <span class="o">=</span><span class="p">[]</span>
+    <span class="n">servers</span> <span class="o">=</span> <span class="n">Jupyter_server_file</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;xxx&#39;</span><span class="p">,</span> <span class="n">username</span><span class="p">)</span>
+    <span class="n">servers</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="n">servers</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">servers</span></div>
+
+
+
+<div class="viewcode-block" id="check_host"><a class="viewcode-back" href="../index.html#JH_SEB.check_host">[docs]</a><span class="k">def</span> <span class="nf">check_host</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">pid</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Log in to the HOST and check if the PID is running there.</span>
+
+<span class="sd">    :param host: hostname</span>
+<span class="sd">    :param pid:  PID to search</span>
+<span class="sd">    :return: True if found, False otherwise</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Ports are handled in ~/.ssh/config since we use OpenSSH</span>
+    <span class="n">COMMAND</span> <span class="o">=</span> <span class="s2">&quot;ps -p &quot;</span> <span class="o">+</span> <span class="n">pid</span> <span class="o">+</span> <span class="s2">&quot;|grep &#39;jupyterhub&#39;&quot;</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">COMMAND</span><span class="p">)</span>
+
+    <span class="n">result</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="n">execute_remote_command_ssh</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">COMMAND</span><span class="p">)</span> <span class="c1"># ssh.stdout.readlines()</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="o">==</span> <span class="p">[]:</span>
+        <span class="c1">#error = ssh.stderr.readlines()</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;ERROR: </span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">error</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="execute_remote_command_ssh"><a class="viewcode-back" href="../index.html#JH_SEB.execute_remote_command_ssh">[docs]</a><span class="k">def</span> <span class="nf">execute_remote_command_ssh</span><span class="p">(</span><span class="n">host</span><span class="p">,</span> <span class="n">command</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    executes a command on the remote host using `ssh`.</span>
+<span class="sd">    Assumes passwordless inter-host connection.</span>
+
+<span class="sd">    :param host: host to connect to</span>
+<span class="sd">    :param command: Command to execute</span>
+<span class="sd">    :return: tuple of the command output and error message</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">error</span><span class="o">=</span><span class="kc">None</span>
+    <span class="n">ssh</span> <span class="o">=</span> <span class="n">subprocess</span><span class="o">.</span><span class="n">Popen</span><span class="p">([</span><span class="s2">&quot;ssh&quot;</span><span class="p">,</span> <span class="s2">&quot;</span><span class="si">%s</span><span class="s2">&quot;</span> <span class="o">%</span> <span class="n">host</span><span class="p">,</span> <span class="n">command</span><span class="p">],</span>
+                           <span class="n">shell</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+                           <span class="n">stdout</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span>
+                           <span class="n">stderr</span><span class="o">=</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">)</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">ssh</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">result</span> <span class="o">==</span> <span class="p">[]:</span>
+        <span class="n">error</span> <span class="o">=</span> <span class="n">ssh</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">readlines</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">result</span><span class="p">,</span> <span class="n">error</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper"><div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="../search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

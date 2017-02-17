@@ -1,0 +1,274 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Brief multiJHub’s POC &#8212; multiJHub 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    './',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true,
+        SOURCELINK_SUFFIX: '.txt'
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head>
+  <body role="document">
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="brief-multijhub-s-poc">
+<h1>Brief multiJHub&#8217;s POC<a class="headerlink" href="#brief-multijhub-s-poc" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="problem-in-focus">
+<h2>Problem in focus:<a class="headerlink" href="#problem-in-focus" title="Permalink to this headline">¶</a></h2>
+<p>The purpose of the module is to provide a simple way to orchestrate multiple
+<a class="reference external" href="https://jupyterhub.readthedocs.io/en/latest/">JupyterHub</a> servers over a set of hosts.</p>
+<p>One JupyterHub server allows to run multiple single-user <a class="reference external" href="http://jupyter.org">Jupyter</a> servers.
+One of the bottlenecks of running many Jupyter servers on a single host &#8211; lack of memory.</p>
+</div>
+<div class="section" id="the-challenge">
+<h2>The challenge:<a class="headerlink" href="#the-challenge" title="Permalink to this headline">¶</a></h2>
+<p>One of the ways to go is to
+launch multiple JupyterHub servers, each running on a  <strong>different</strong> node. In this case the memory pressure is decreased.
+The challenge is to be able to track the node on which the user runs his single-user <cite>Jupyter</cite> server, so his can
+continue to work with the notebook after logging out from the JupyterHub UI.</p>
+</div>
+<div class="section" id="alternatives">
+<h2>Alternatives:<a class="headerlink" href="#alternatives" title="Permalink to this headline">¶</a></h2>
+<p>There are several ready to use <a class="reference external" href="https://github.com/jupyterhub/jupyterhub/wiki/Spawners">solutions</a>,
+which probably are more scalable, but require more <strong>intrusion</strong>
+into the already existing infrastructure, what can be pretty undesirable.</p>
+</div>
+<div class="section" id="proposed-solution">
+<h2>Proposed solution:<a class="headerlink" href="#proposed-solution" title="Permalink to this headline">¶</a></h2>
+<p>A simple, though not complete, solution is proposed to tackle this challenge, introducing  minimal changes to the
+existing infrastructure.
+The solution uses <code class="docutils literal"><span class="pre">Flask</span></code> webserver and works under the following assumptions:</p>
+<ol class="arabic simple">
+<li>the hosts must have <strong>passwordless</strong> <code class="docutils literal"><span class="pre">ssh</span></code> connection to each other</li>
+<li>it should be certain flexibility to open ports above 8000</li>
+<li>it should be possible to install <code class="docutils literal"><span class="pre">NFS</span></code> into the nodes</li>
+</ol>
+<p>One of the hosts shares with <code class="docutils literal"><span class="pre">NFS</span></code> the <code class="docutils literal"><span class="pre">$HOME</span></code> where the all <code class="docutils literal"><span class="pre">Jupyter</span></code> users have their accounts,
+i.e. <cite>/home/juser1</cite>, <cite>/home/juser2</cite>.
+The <code class="docutils literal"><span class="pre">$HOME</span></code> is being exported to the rest nodes subjected to run <code class="docutils literal"><span class="pre">JupyterHub</span></code> servers, one server per node.</p>
+<p>The user, who runs the <code class="docutils literal"><span class="pre">Flask</span></code> webserver, is able to read recursively the <code class="docutils literal"><span class="pre">$HOME</span></code> for each <code class="docutils literal"><span class="pre">JupyterHub</span></code> user.
+It is needed in order to be able to figure out the connection between the user and the <code class="docutils literal"><span class="pre">Jupyter</span></code> server he/she runs.
+This is achieved with the Access Control Lists (ACLs).
+For example, in order to allow group <code class="docutils literal"><span class="pre">flask_users</span></code> to have read access to the
+<code class="docutils literal"><span class="pre">/home/juser1/.local/share/jupyter/runtime/</span></code> directory, storing the data about running <code class="docutils literal"><span class="pre">Jupyter</span></code> servers and
+notebooks, one has to issue:
+<code class="docutils literal"><span class="pre">sudo</span> <span class="pre">setfacl</span> <span class="pre">-md</span> <span class="pre">g:flask_users:r</span> <span class="pre">/home/juser1/.local/share/jupyter/runtime/</span></code>.
+This setup while allowing for the defined usergroup collect information about running <code class="docutils literal"><span class="pre">Jupyter</span></code> servers, still keeps
+<strong>isolation</strong> between the <code class="docutils literal"><span class="pre">Jupyter</span></code> users.</p>
+</div>
+<div class="section" id="code-docstrings">
+<h2>Code docstrings:<a class="headerlink" href="#code-docstrings" title="Permalink to this headline">¶</a></h2>
+<div class="toctree-wrapper compound">
+</div>
+<span class="target" id="module-JH_SEB"></span><dl class="function">
+<dt id="JH_SEB.check_host">
+<code class="descclassname">JH_SEB.</code><code class="descname">check_host</code><span class="sig-paren">(</span><em>host</em>, <em>pid</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/JH_SEB.html#check_host"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#JH_SEB.check_host" title="Permalink to this definition">¶</a></dt>
+<dd><p>Log in to the HOST and check if the PID is running there.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>host</strong> &#8211; hostname</li>
+<li><strong>pid</strong> &#8211; PID to search</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">True if found, False otherwise</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="JH_SEB.execute_remote_command_ssh">
+<code class="descclassname">JH_SEB.</code><code class="descname">execute_remote_command_ssh</code><span class="sig-paren">(</span><em>host</em>, <em>command</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/JH_SEB.html#execute_remote_command_ssh"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#JH_SEB.execute_remote_command_ssh" title="Permalink to this definition">¶</a></dt>
+<dd><p>executes a command on the remote host using <cite>ssh</cite>.
+Assumes passwordless inter-host connection.</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><ul class="first simple">
+<li><strong>host</strong> &#8211; host to connect to</li>
+<li><strong>command</strong> &#8211; Command to execute</li>
+</ul>
+</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><p class="first last">tuple of the command output and error message</p>
+</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="JH_SEB.find_host">
+<code class="descclassname">JH_SEB.</code><code class="descname">find_host</code><span class="sig-paren">(</span><em>pid</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/JH_SEB.html#find_host"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#JH_SEB.find_host" title="Permalink to this definition">¶</a></dt>
+<dd><p>Find a host based on the <code class="docutils literal"><span class="pre">PID</span></code> of the <code class="docutils literal"><span class="pre">Jupyter</span></code> server</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>pid</strong> &#8211; the <code class="docutils literal"><span class="pre">PID</span></code> of the server</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body"><code class="docutils literal"><span class="pre">None</span></code> if not found, hostname otherwise</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="JH_SEB.get_ip">
+<code class="descclassname">JH_SEB.</code><code class="descname">get_ip</code><span class="sig-paren">(</span><em>server</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/JH_SEB.html#get_ip"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#JH_SEB.get_ip" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extracts the PID from the string <code class="docutils literal"><span class="pre">server</span></code> and finds IP of the PID</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>server</strong> &#8211; the string like <cite>/home/ubuntu/.local/share/jupyter/runtime/nbserver-2085.json</cite></td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">the <cite>IP</cite> running the <code class="docutils literal"><span class="pre">Jupyter</span></code> server with the given <cite>PID</cite></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="JH_SEB.get_jupyter_servers">
+<code class="descclassname">JH_SEB.</code><code class="descname">get_jupyter_servers</code><span class="sig-paren">(</span><em>username</em><span class="sig-paren">)</span><a class="reference internal" href="_modules/JH_SEB.html#get_jupyter_servers"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#JH_SEB.get_jupyter_servers" title="Permalink to this definition">¶</a></dt>
+<dd><p>Are there Jupyter servers running and how many for the <code class="docutils literal"><span class="pre">username</span></code>?</p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Parameters:</th><td class="field-body"><strong>username</strong> &#8211; username at SEB cluster</td>
+</tr>
+<tr class="field-even field"><th class="field-name">Returns:</th><td class="field-body">list of running <cite>Jupyter</cite> servers</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+<dl class="function">
+<dt id="JH_SEB.get_new_ip">
+<code class="descclassname">JH_SEB.</code><code class="descname">get_new_ip</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="_modules/JH_SEB.html#get_new_ip"><span class="viewcode-link">[source]</span></a><a class="headerlink" href="#JH_SEB.get_new_ip" title="Permalink to this definition">¶</a></dt>
+<dd><p>function selects one of the nodes in the <cite>CLUSTER</cite> based on some
+rule...</p>
+<p>At the moment it is just a random choice between available hosts:
+<code class="docutils literal"><span class="pre">[random.choice(CLUSTER)][0]</span></code></p>
+<table class="docutils field-list" frame="void" rules="none">
+<col class="field-name" />
+<col class="field-body" />
+<tbody valign="top">
+<tr class="field-odd field"><th class="field-name">Returns:</th><td class="field-body"><code class="docutils literal"><span class="pre">IP</span></code> address of the selected node</td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
+<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
+<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
+</ul>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="#">Table Of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">Brief multiJHub&#8217;s POC</a><ul>
+<li><a class="reference internal" href="#problem-in-focus">Problem in focus:</a></li>
+<li><a class="reference internal" href="#the-challenge">The challenge:</a></li>
+<li><a class="reference internal" href="#alternatives">Alternatives:</a></li>
+<li><a class="reference internal" href="#proposed-solution">Proposed solution:</a></li>
+<li><a class="reference internal" href="#code-docstrings">Code docstrings:</a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+</ul>
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/index.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3>Quick search</h3>
+    <form class="search" action="search.html" method="get">
+      <div><input type="text" name="q" /></div>
+      <div><input type="submit" value="Go" /></div>
+      <input type="hidden" name="check_keywords" value="yes" />
+      <input type="hidden" name="area" value="default" />
+    </form>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 1.5.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.9</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
